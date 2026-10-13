@@ -576,7 +576,7 @@ function gerarPdfDia() {
   // Indicadores
   const kp = [
     ["Atividades", L.length], ["Concluídas", n(isDone)], ["Pendentes", n(isOpen)],
-    ["Horas trabalhadas", fmtMin(mins)], ["Tempo médio", fmtMin(comTempo ? mins / comTempo : 0)], ["Empresas atendidas", empresas.length],
+    ["Horas trabalhadas", fmtMin(mins)], ["Tempo médio", fmtMin(comTempo ? mins / comTempo : 0)], ["Empresas", empresas.length],
   ];
   const cw = (W - 2 * M - 5 * 3) / 6;
   kp.forEach(([l, v], i) => {
@@ -628,7 +628,10 @@ function gerarPdfDia() {
   const head = [...(multi ? ["Resp."] : []), "Início", "Fim", "Tempo", "Empresa", "Categoria", "Atividade", "Resultado", "Status"];
   tabela(head, L.length ? L.map((a) => [...(multi ? [a.responsavel] : []), a.horaInicial, a.horaFinal || "-", a.horaFinal ? fmtMin(a.minutos) : "-",
     txt(a.empresa), txt(a.categoria), txt(a.atividade), txt(a.resultado), txt(a.status)]) : [[{ content: "Nenhuma atividade registrada.", colSpan: head.length }]],
-    { columnStyles: multi ? { 6: { cellWidth: 44 }, 7: { cellWidth: 34 } } : { 5: { cellWidth: 50 }, 6: { cellWidth: 38 } } });
+    { styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.5, lineColor: LINHA, lineWidth: 0.2, textColor: [20, 32, 46], valign: "top" },
+      columnStyles: multi
+        ? { 0: { cellWidth: 13 }, 1: { cellWidth: 11 }, 2: { cellWidth: 11 }, 3: { cellWidth: 11 }, 4: { cellWidth: 24 }, 5: { cellWidth: 22 }, 8: { cellWidth: 22 } }
+        : { 0: { cellWidth: 11 }, 1: { cellWidth: 11 }, 2: { cellWidth: 11 }, 3: { cellWidth: 26 }, 4: { cellWidth: 24 }, 7: { cellWidth: 22 } } });
 
   // Pendências
   const pend = L.filter(isOpen);
