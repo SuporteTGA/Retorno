@@ -76,7 +76,9 @@ async function createFirebaseStore() {
       return added;
     },
     subscribeCadastros(cb) {
-      return fs.onSnapshot(docCad, (s) => cb(s.exists() ? { ...CADASTROS_PADRAO, ...s.data() } : { ...CADASTROS_PADRAO }));
+      // se a leitura falhar (sem permissão / offline), usa as listas padrão para o formulário não ficar vazio
+      return fs.onSnapshot(docCad, (s) => cb(s.exists() ? { ...CADASTROS_PADRAO, ...s.data() } : { ...CADASTROS_PADRAO }),
+        (err) => { console.error(err); cb({ ...CADASTROS_PADRAO }); });
     },
     saveCadastros: (obj) => fs.setDoc(docCad, obj),
   };

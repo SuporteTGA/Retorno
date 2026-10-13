@@ -39,7 +39,8 @@ const S = { store: null, me: null, atv: [], cad: null, editing: null, charts: {}
 
   S.store.onAuth((user) => {
     if (!user) { show("login"); return; }
-    let who = USUARIOS[user.email] || lsGet("rda_who", "");
+    let who = USUARIOS[user.email] || (IS_DEMO ? lsGet("rda_who", "") : "");
+    if (!IS_DEMO && !who) { semAcesso(user.email); return; }
     if (!PESSOAS.includes(who)) { show("who"); return; }
     start(who, user);
   });
@@ -48,6 +49,16 @@ const S = { store: null, me: null, atv: [], cad: null, editing: null, charts: {}
   $("#btnLogout").onclick = () => { lsSet("rda_who", ""); S.store.logout(); };
   $$(".who").forEach((b) => (b.onclick = () => { lsSet("rda_who", b.dataset.who); start(b.dataset.who, {}); }));
 })();
+
+// e-mail Google que não está liberado: explica e oferece trocar de conta
+function semAcesso(email) {
+  show("login");
+  $("#btnLogout").hidden = false;
+  $("#btnLogin").textContent = "Entrar com outra conta Google";
+  $("#btnLogin").onclick = async () => { try { await S.store.logout(); await S.store.login(); } catch (e) { $("#loginErr").textContent = "Não foi possível entrar: " + (e.code || e.message); } };
+  const lib = Object.keys(USUARIOS).join(" ou ");
+  $("#loginErr").innerHTML = `A conta <b>${esc(email)}</b> não tem acesso a este sistema.<br>Entre com ${esc(lib)}.`;
+}
 
 function show(view) {
   $("#loginView").hidden = view !== "login";
