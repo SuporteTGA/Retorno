@@ -8,7 +8,9 @@ service cloud.firestore {
         && request.auth.token.email_verified == true
         && request.auth.token.email.lower() in [
           'suporte@tga.adm.br',
-          'pdi@tga.adm.br'
+          'luisrickalves10@gmail.com',
+          'pdi@tga.adm.br',
+          'suportedevtga@gmail.com'
         ];
     }
     match /atividades/{id} {

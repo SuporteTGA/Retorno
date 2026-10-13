@@ -20,7 +20,9 @@ export const firebaseConfig = {
 //    Se alguém entrar com um e-mail que não está aqui, o sistema pergunta "Quem é você?".
 export const USUARIOS = {
   "suporte@tga.adm.br": "Luis",
+  "luisrickalves10@gmail.com": "Luis",
   "pdi@tga.adm.br": "Carlos",
+  "suportedevtga@gmail.com": "Carlos",
 };
 
 // 3) Pessoas que registram atividades (ordem das abas/filtros)
