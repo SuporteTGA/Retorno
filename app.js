@@ -269,6 +269,8 @@ function setupDashboard() {
   $("#dDe").value = monthStart(); $("#dAte").value = today();
   ["#dPessoa", "#dPeriodo", "#dDe", "#dAte"].forEach((s) => ($(s).oninput = () => { lsSet("rda_dp", $("#dPessoa").value); lsSet("rda_dper", $("#dPeriodo").value); renderDashboard(); }));
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderDashboard);
+  $("#pdfData").value = today();
+  $("#btnPdf").onclick = gerarPdfDia;
 }
 function periodo() {
   const p = $("#dPeriodo").value;
@@ -531,3 +533,109 @@ function parseTime(v) {
   return m ? `${pad(m[1])}:${m[2]}` : "";
 }
 function hash(s) { let h1 = 0x811c9dc5, h2 = 0; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = (Math.imul(h2, 31) + c) | 0; } return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36); }
+
+// ============ relatório PDF do dia ============
+function gerarPdfDia() {
+  const JS = window.jspdf?.jsPDF;
+  if (!JS) { toast("Biblioteca de PDF não carregou. Recarregue a página."); return; }
+  const dia = $("#pdfData").value || today();
+  const pessoa = $("#dPessoa").value; // "" = Luis + Carlos
+  const pessoas = pessoa ? [pessoa] : PESSOAS;
+  const L = S.atv.filter((a) => a.data === dia && pessoas.includes(a.responsavel));
+  if (!L.length && !window.__pdfConfirm) { window.__pdfConfirm = true; setTimeout(() => (window.__pdfConfirm = false), 4000); toast("Nenhuma atividade nesse dia. Clique de novo para gerar mesmo assim."); return; }
+  window.__pdfConfirm = false;
+
+  const doc = new JS({ unit: "mm", format: "a4" });
+  const W = doc.internal.pageSize.getWidth(), M = 14;
+  const AZUL = [11, 61, 110], CINZA = [90, 100, 115], LINHA = [221, 227, 234];
+  const mins = L.reduce((s, a) => s + a.minutos, 0);
+  const comTempo = L.filter((a) => a.minutos > 0).length;
+  const empresas = [...new Set(L.map((a) => a.empresa).filter(Boolean))];
+  const n = (fn) => L.filter(fn).length;
+  const txt = (s) => String(s ?? "").replace(/[—–]/g, "-").replace(/[^\x00-\xFF]/g, "");
+
+  // Cabeçalho
+  doc.setFillColor(...AZUL); doc.rect(0, 0, W, 26, "F");
+  doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+  doc.text("Relatório Diário de Atividades", M, 12);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  doc.text(`${brDate(dia)}  ·  ${pessoas.join(" e ")}  ·  Para: ${GESTOR}`.replace(/·/g, "|"), M, 20);
+  let y = 34;
+
+  // Indicadores
+  const kp = [
+    ["Atividades", L.length], ["Concluídas", n(isDone)], ["Pendentes", n(isOpen)],
+    ["Horas trabalhadas", fmtMin(mins)], ["Tempo médio", fmtMin(comTempo ? mins / comTempo : 0)], ["Empresas atendidas", empresas.length],
+  ];
+  const cw = (W - 2 * M - 5 * 3) / 6;
+  kp.forEach(([l, v], i) => {
+    const x = M + i * (cw + 3);
+    doc.setDrawColor(...LINHA); doc.setFillColor(247, 249, 252); doc.roundedRect(x, y, cw, 18, 1.5, 1.5, "FD");
+    doc.setFillColor(...AZUL); doc.rect(x, y, 1.2, 18, "F");
+    doc.setTextColor(...CINZA); doc.setFontSize(7.5); doc.text(l, x + 3.5, y + 5.5);
+    doc.setTextColor(20, 32, 46); doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text(String(v), x + 3.5, y + 14);
+    doc.setFont("helvetica", "normal");
+  });
+  y += 25;
+
+  const titulo = (t) => {
+    if (y > 270) { doc.addPage(); y = 18; }
+    doc.setTextColor(...AZUL); doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.text(t, M, y);
+    doc.setFont("helvetica", "normal"); y += 3;
+  };
+  const tabela = (head, body, opts = {}) => {
+    doc.autoTable({
+      startY: y, head: [head], body, margin: { left: M, right: M }, theme: "grid",
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 1.8, lineColor: LINHA, lineWidth: 0.2, textColor: [20, 32, 46], valign: "top" },
+      headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [247, 249, 252] }, ...opts,
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  };
+
+  // Resumo por pessoa (quando são os dois)
+  if (pessoas.length > 1) {
+    titulo("Resumo por pessoa");
+    tabela(["Pessoa", "Atividades", "Concluídas", "Pendentes", "Horas"], pessoas.map((p) => {
+      const m = L.filter((a) => a.responsavel === p);
+      return [p, m.length, m.filter(isDone).length, m.filter(isOpen).length, fmtMin(m.reduce((s, a) => s + a.minutos, 0))];
+    }), { columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" } } });
+  }
+
+  // Por categoria
+  const cats = {}; L.forEach((a) => { const k = a.categoria || "(sem categoria)"; cats[k] = cats[k] || [0, 0]; cats[k][0]++; cats[k][1] += a.minutos; });
+  if (L.length) {
+    titulo("Tempo por categoria");
+    tabela(["Categoria", "Atividades", "Horas", "% do tempo"], Object.entries(cats).sort((a, b) => b[1][1] - a[1][1])
+      .map(([k, [c, m]]) => [txt(k), c, fmtMin(m), mins ? Math.round((m / mins) * 100) + "%" : "-"]),
+      { columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" } } });
+  }
+
+  // Atividades do dia
+  titulo("Atividades realizadas");
+  const multi = pessoas.length > 1;
+  const head = [...(multi ? ["Resp."] : []), "Início", "Fim", "Tempo", "Empresa", "Categoria", "Atividade", "Resultado", "Status"];
+  tabela(head, L.length ? L.map((a) => [...(multi ? [a.responsavel] : []), a.horaInicial, a.horaFinal || "-", a.horaFinal ? fmtMin(a.minutos) : "-",
+    txt(a.empresa), txt(a.categoria), txt(a.atividade), txt(a.resultado), txt(a.status)]) : [[{ content: "Nenhuma atividade registrada.", colSpan: head.length }]],
+    { columnStyles: multi ? { 6: { cellWidth: 44 }, 7: { cellWidth: 34 } } : { 5: { cellWidth: 50 }, 6: { cellWidth: 38 } } });
+
+  // Pendências
+  const pend = L.filter(isOpen);
+  titulo("Pendências");
+  tabela([...(multi ? ["Resp."] : []), "Atividade", "Status", "Próxima ação", "Solicitante"],
+    pend.length ? pend.map((a) => [...(multi ? [a.responsavel] : []), txt(a.atividade), txt(a.status), txt(a.proximaAcao) || "-", txt(a.solicitante) || "-"])
+      : [[{ content: "Sem pendências.", colSpan: multi ? 5 : 4 }]]);
+
+  // Rodapé
+  const pages = doc.getNumberOfPages();
+  const agora = new Date();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(...CINZA);
+    doc.text(`Gerado em ${brDate(isoDate(agora))} às ${nowHM()} | Registro Diário de Atividades`, M, 290);
+    doc.text(`Página ${i} de ${pages}`, W - M, 290, { align: "right" });
+  }
+
+  const nome = `Relatorio_${pessoa || "Luis_Carlos"}_${dia}.pdf`;
+  doc.save(nome);
+  toast("PDF gerado: " + nome);
+}

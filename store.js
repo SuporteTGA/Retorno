@@ -1,7 +1,8 @@
 // Camada de dados: Firebase (tempo real) ou Demo (localStorage)
 import { firebaseConfig, CADASTROS_PADRAO } from "./config.js";
 
-export const IS_DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("COLE");
+// ?demo no endereço abre o modo demonstração (dados de exemplo, só neste navegador)
+export const IS_DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("COLE") || new URLSearchParams(location.search).has("demo");
 
 const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
 
