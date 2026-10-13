@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registro Diário de Atividades</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">📊 <span>Produtividade — Luis Henrique &amp; Carlos</span></div>
+    <div class="topbar-right">
+      <span id="sync" class="sync" title="Status da sincronização">●</span>
+      <span id="userName" class="user"></span>
+      <button id="btnLogout" class="btn ghost small" hidden>Sair</button>
+    </div>
+  </header>
+
+  <!-- Tela de login -->
+  <section id="loginView" class="login" hidden>
+    <div class="card login-card">
+      <h1>📋 Registro Diário de Atividades</h1>
+      <p>Entre com sua conta Google para registrar e acompanhar as atividades.</p>
+      <button id="btnLogin" class="btn primary">Entrar com Google</button>
+      <p id="loginErr" class="err"></p>
+    </div>
+  </section>
+
+  <!-- Escolha de quem é você (quando o e-mail não está mapeado) -->
+  <section id="whoView" class="login" hidden>
+    <div class="card login-card">
+      <h1>Quem é você?</h1>
+      <p>Escolha o seu nome para que as atividades fiquem no seu registro.</p>
+      <div class="row gap">
+        <button class="btn primary who" data-who="Luis">Luis</button>
+        <button class="btn primary who" data-who="Carlos">Carlos</button>
+      </div>
+    </div>
+  </section>
+
+  <main id="app" hidden>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="nova">➕ Nova atividade</button>
+      <button class="tab" data-tab="registros">📋 Registros</button>
+      <button class="tab" data-tab="dashboard">📊 Dashboard</button>
+      <button class="tab" data-tab="relatorio">📄 Relatório do dia</button>
+      <button class="tab" data-tab="cadastros">⚙️ Cadastros</button>
+    </nav>
+
+    <!-- NOVA ATIVIDADE -->
+    <section id="tab-nova" class="panel active">
+      <div class="card">
+        <div class="card-head">
+          <h2 id="formTitle">Nova atividade</h2>
+          <div class="row gap">
+            <button type="button" id="btnStartNow" class="btn ghost small">▶ Iniciar agora</button>
+          </div>
+        </div>
+        <form id="formAtv" class="grid-form" autocomplete="off">
+          <input type="hidden" name="id">
+          <label>Responsável
+            <select name="responsavel" required></select>
+          </label>
+          <label>Data
+            <input type="date" name="data" required>
+          </label>
+          <label>Hora inicial
+            <input type="time" name="horaInicial" required>
+          </label>
+          <label>Hora final
+            <div class="row">
+              <input type="time" name="horaFinal">
+              <button type="button" class="btn ghost small" id="btnNowEnd" title="Agora">⏱</button>
+            </div>
+          </label>
+          <label>Tempo
+            <input type="text" name="tempo" readonly tabindex="-1" class="readonly">
+          </label>
+          <label>Empresa
+            <select name="empresa" required></select>
+          </label>
+          <label>Categoria
+            <select name="categoria" required></select>
+          </label>
+          <label>Prioridade
+            <select name="prioridade" required></select>
+          </label>
+          <label>Status
+            <select name="status" required></select>
+          </label>
+          <label>Solicitante
+            <input type="text" name="solicitante" list="dlSolicitantes">
+            <datalist id="dlSolicitantes"></datalist>
+          </label>
+          <label class="span2">Atividade executada
+            <textarea name="atividade" rows="2" required></textarea>
+          </label>
+          <label class="span2">Resultado obtido
+            <textarea name="resultado" rows="2"></textarea>
+          </label>
+          <label class="span2">Próxima ação
+            <input type="text" name="proximaAcao">
+          </label>
+          <label class="span2">Observações
+            <textarea name="observacoes" rows="2"></textarea>
+          </label>
+          <div class="span-all row gap end">
+            <button type="button" id="btnCancelEdit" class="btn ghost" hidden>Cancelar edição</button>
+            <button type="submit" class="btn primary" id="btnSave">Salvar atividade</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Minhas atividades de hoje</h2>
+          <span class="muted" id="hojeResumo"></span>
+        </div>
+        <div id="hojeLista" class="list"></div>
+      </div>
+    </section>
+
+    <!-- REGISTROS -->
+    <section id="tab-registros" class="panel">
+      <div class="card">
+        <div class="filters">
+          <select id="fPessoa"></select>
+          <input type="date" id="fDe" title="De">
+          <input type="date" id="fAte" title="Até">
+          <select id="fStatus"><option value="">Todos os status</option></select>
+          <select id="fEmpresa"><option value="">Todas as empresas</option></select>
+          <input type="search" id="fBusca" placeholder="Buscar…">
+          <button class="btn ghost small" id="btnCsv">⬇ CSV</button>
+        </div>
+        <div class="muted small" id="regCount"></div>
+        <div class="table-wrap">
+          <table class="tbl" id="tblReg">
+            <thead><tr>
+              <th>Resp.</th><th>Data</th><th>Início</th><th>Fim</th><th>Tempo</th><th>Empresa</th>
+              <th>Categoria</th><th>Prior.</th><th>Atividade</th><th>Resultado</th><th>Status</th>
+              <th>Próxima ação</th><th>Solicitante</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard" class="panel">
+      <div class="filters">
+        <select id="dPessoa"></select>
+        <select id="dPeriodo">
+          <option value="tudo">Todo o período</option>
+          <option value="hoje">Hoje</option>
+          <option value="semana">Esta semana</option>
+          <option value="mes" selected>Este mês</option>
+          <option value="custom">Personalizado…</option>
+        </select>
+        <input type="date" id="dDe" hidden>
+        <input type="date" id="dAte" hidden>
+        <span class="muted small" id="dLabel"></span>
+      </div>
+      <div class="kpis" id="kpis"></div>
+
+      <div class="charts">
+        <div class="card chart-card">
+          <h3>Atividades por categoria</h3>
+          <div class="chart-box tall"><canvas id="chCategoria"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <h3>Atividades por status</h3>
+          <div class="chart-box"><canvas id="chStatus"></canvas></div>
+        </div>
+        <div class="card chart-card wide">
+          <h3>Horas trabalhadas por dia</h3>
+          <div class="legend" id="lgDia"></div>
+          <div class="chart-box"><canvas id="chDia"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <h3>Atividades por empresa</h3>
+          <div class="chart-box"><canvas id="chEmpresa"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <h3>Atividades por prioridade</h3>
+          <div class="chart-box"><canvas id="chPrioridade"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RELATÓRIO DO DIA -->
+    <section id="tab-relatorio" class="panel">
+      <div class="card">
+        <div class="filters">
+          <select id="rPessoa"></select>
+          <input type="date" id="rData">
+        </div>
+        <div class="rel-grid">
+          <div>
+            <div class="kpis small-kpis" id="relKpis"></div>
+            <h3>Principais entregas</h3>
+            <ol id="relEntregas" class="rel-list"></ol>
+            <h3>Pendências</h3>
+            <ol id="relPend" class="rel-list"></ol>
+            <label>Observações para o gestor
+              <textarea id="relObs" rows="3" placeholder="Opcional — entra no fim da mensagem"></textarea>
+            </label>
+          </div>
+          <div>
+            <h3>✉️ Mensagem pronta para enviar ao Bruno</h3>
+            <textarea id="relMsg" rows="18" class="msg"></textarea>
+            <div class="row gap">
+              <button class="btn primary" id="btnCopy">Copiar mensagem</button>
+              <a class="btn ghost" id="btnWpp" target="_blank" rel="noopener">Abrir no WhatsApp</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CADASTROS -->
+    <section id="tab-cadastros" class="panel">
+      <div class="card">
+        <div class="card-head">
+          <h2>Listas de apoio</h2>
+          <button class="btn primary" id="btnSaveCad">Salvar cadastros</button>
+        </div>
+        <p class="muted small">Um item por linha. As listas alimentam os campos do formulário para os dois usuários.</p>
+        <div class="cad-grid" id="cadGrid"></div>
+      </div>
+      <div class="card">
+        <h2>Importar histórico da planilha</h2>
+        <p class="muted small">Baixe a planilha antiga em <b>Arquivo → Fazer download → Microsoft Excel (.xlsx)</b> e selecione o arquivo abaixo. São lidas as abas <i>Registro Diário Luis</i> e <i>Registro Diário Carlos</i>. Registros já importados são ignorados (não duplica).</p>
+        <div class="row gap">
+          <input type="file" id="fileImport" accept=".xlsx,.xls">
+          <button class="btn primary" id="btnImport" disabled>Importar</button>
+        </div>
+        <p id="importMsg" class="muted small"></p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

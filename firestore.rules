@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Somente estes e-mails podem ler e gravar (troque pelos e-mails reais do Luis e do Carlos;
+    // adicione o do Bruno se ele também for acessar o dashboard)
+    function permitido() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in [
+          'suporte@tga.adm.br',
+          'pdi@tga.adm.br'
+        ];
+    }
+    match /atividades/{id} {
+      allow read, write: if permitido();
+    }
+    match /config/{id} {
+      allow read, write: if permitido();
+    }
+  }
+}
